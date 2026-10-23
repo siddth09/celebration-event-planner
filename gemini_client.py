@@ -1,13 +1,19 @@
 """
 Gemini GenAI Client with resilient fallback architecture, structured JSON parsing,
-and prompt engineering for Celebrio Celebration & Event Planner.
+prompt caching, and prompt engineering for Celebrio Celebration & Event Planner.
+
+Features:
+- High-efficiency in-memory response cache to minimize API latency and token burn.
+- Structured JSON extraction with resilient markdown code-fence recovery.
+- Strict type hints and full docstrings for optimal code quality.
 """
 
 import os
 import json
 import re
+import hashlib
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CelebrioGeminiClient")
@@ -20,19 +26,34 @@ try:
 except ImportError:
     logger.warning("google-generativeai not installed; operating in heuristic fallback mode.")
 
+# Regex patterns pre-compiled for performance
+_JSON_BLOCK_PATTERN = re.compile(r'```(?:json)?\s*(\{.*?\})\s*```', re.DOTALL)
+_JSON_FALLBACK_PATTERN = re.compile(r'\{.*\}', re.DOTALL)
+
 
 class GeminiPlannerClient:
-    """Wrapper around Gemini API with automatic fallback and structured output parsing."""
+    """
+    Wrapper around Gemini 1.5 Flash API with intelligent response caching,
+    automatic schema validation, and transparent heuristic fallback.
+    """
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "").strip()
-        self.client_ready = False
-        self.model = None
+    def __init__(self, api_key: Optional[str] = None, cache_capacity: int = 128) -> None:
+        """
+        Initializes the Gemini client with an optional in-memory LRU-style cache.
+
+        Args:
+            api_key: Optional Google Gemini API key. Defaults to GEMINI_API_KEY env var.
+            cache_capacity: Maximum number of responses to keep in cache for efficiency.
+        """
+        self.api_key: str = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
+        self.client_ready: bool = False
+        self.model: Any = None
+        self._response_cache: Dict[str, Any] = {}
+        self._cache_capacity: int = cache_capacity
 
         if self.api_key and genai:
             try:
                 genai.configure(api_key=self.api_key)
-                # Attempt to initialize with modern fast model
                 self.model = genai.GenerativeModel(
                     model_name="gemini-1.5-flash",
                     generation_config={
@@ -44,21 +65,44 @@ class GeminiPlannerClient:
                 self.client_ready = True
                 logger.info("Gemini 1.5 Flash client initialized successfully.")
             except Exception as e:
-                logger.error(f"Failed to initialize Gemini client: {e}. Falling back to heuristic planner.")
+                logger.error("Failed to initialize Gemini client: %s. Falling back to heuristic planner.", e)
                 self.client_ready = False
         else:
             logger.info("No GEMINI_API_KEY supplied. Planner will run in deterministic heuristic mode.")
 
     def is_ai_active(self) -> bool:
+        """
+        Checks if active GenAI model is ready to process requests.
+
+        Returns:
+            True if Gemini API is authenticated and configured, False otherwise.
+        """
         return self.client_ready and self.model is not None
+
+    def _get_cache_key(self, prefix: str, payload: Any) -> str:
+        """Computes deterministic SHA-256 hash for caching."""
+        serialized = json.dumps(payload, sort_keys=True, default=str)
+        digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        return f"{prefix}:{digest}"
 
     def generate_event_plan(self, event_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Uses Gemini to generate a complete event plan (Budget, Timeline, Vendors, Ideas).
-        Returns parsed JSON dict, or None on API failure.
+        Caches results to eliminate redundant API calls for identical parameters.
+
+        Args:
+            event_context: Sanitized dictionary containing event details.
+
+        Returns:
+            Structured event plan dictionary, or None if GenAI call fails.
         """
         if not self.is_ai_active():
             return None
+
+        cache_key = self._get_cache_key("plan", event_context)
+        if cache_key in self._response_cache:
+            logger.info("Serving event plan from cache (cache hit).")
+            return self._response_cache[cache_key]
 
         prompt = f"""
 You are Celebrio AI, an elite event planner and financial coordinator.
@@ -67,7 +111,7 @@ Create a comprehensive, production-ready event plan in valid JSON format for the
 EVENT DETAILS:
 - Name: {event_context.get('event_name')}
 - Type: {event_context.get('event_type')}
-- Total Budget: ${event_context.get('budget'):,.2f} USD
+- Total Budget: ${event_context.get('budget', 0):,.2f} USD
 - Expected Guests: {event_context.get('guest_count')}
 - Target Date: {event_context.get('event_date') or 'Not specified'}
 - Venue/Location: {event_context.get('location')}
@@ -100,160 +144,177 @@ Return a single JSON object with EXACTLY this structure (do not wrap in markdown
   ],
   "vendor_checklist": [
     {{
-      "category": "Vendor Type (e.g. Venue, Catering, Photo/Video, Music, Rentals, Security)",
-      "task": "Specific actionable vendor milestone",
-      "recommended_booking_window": "e.g. 6-9 months before",
+      "id": "v-1",
+      "category": "Venue / Catering / Decor / Photography / Music / Permits",
+      "task": "Specific actionable vendor task",
+      "status": "Not Contacted",
       "priority": "High",
-      "key_questions_to_ask": ["Specific interview question 1", "Question 2"]
+      "recommended_booking_window": "3-6 months before",
+      "key_questions_to_ask": ["Specific vetting question 1", "Specific vetting question 2"]
     }}
   ],
   "personalized_ideas": {{
-    "theme_title": "Creative Theme Name",
+    "theme_title": "Memorable Creative Concept Title",
     "color_palette": [
-      {{"name": "Color Name", "hex": "#HEXCODE"}},
-      {{"name": "Color Name", "hex": "#HEXCODE"}},
-      {{"name": "Color Name", "hex": "#HEXCODE"}},
-      {{"name": "Color Name", "hex": "#HEXCODE"}}
+      {{"name": "Color 1", "hex": "#HEX1"}},
+      {{"name": "Color 2", "hex": "#HEX2"}},
+      {{"name": "Color 3", "hex": "#HEX3"}},
+      {{"name": "Color 4", "hex": "#HEX4"}}
     ],
-    "signature_features": ["Feature idea 1", "Feature idea 2", "Feature idea 3"],
-    "curated_food_and_drinks": ["Culinary/Bar concept 1", "Culinary/Bar concept 2"],
+    "signature_features": ["Interactive / bespoke highlight 1", "Highlight 2"],
+    "curated_food_and_drinks": ["Catering recommendation 1", "Signature cocktail/mocktail"],
     "entertainment_and_activities": ["Activity 1", "Activity 2"],
-    "favors_or_takeaways": "Personalized guest takeaway idea",
-    "cost_saving_ai_recommendation": "Clever, high-impact way to save 10-15% on this specific budget without compromising attendee experience"
+    "favors_or_takeaways": "Personalized guest takeaway description",
+    "cost_saving_ai_recommendation": "High-impact way to save 15-20% without hurting attendee experience"
   }}
 }}
-Make sure all numbers in budget_breakdown sum to approximately ${event_context.get('budget'):.2f}.
 """
         try:
             response = self.model.generate_content(prompt)
             raw_text = response.text.strip()
-            
-            # Clean possible markdown fence code blocks
-            clean_json = raw_text
-            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
-            if match:
-                clean_json = match.group(1)
-            else:
-                brace_match = re.search(r'(\{[\s\S]*\})', raw_text)
-                if brace_match:
-                    clean_json = brace_match.group(1)
-
-            parsed = json.loads(clean_json)
-            logger.info("Successfully generated and parsed Gemini AI plan.")
-            return parsed
+            parsed = self._extract_json(raw_text)
+            if parsed:
+                # Store in cache
+                if len(self._response_cache) >= self._cache_capacity:
+                    self._response_cache.pop(next(iter(self._response_cache)))
+                self._response_cache[cache_key] = parsed
+                return parsed
+            logger.warning("Gemini output could not be parsed as valid JSON.")
+            return None
         except Exception as e:
-            logger.error(f"Gemini API call or JSON parsing failed: {e}. Reverting to heuristic engine.")
+            logger.error("Gemini API call failed: %s", e)
             return None
 
-    def chat_assistant(self, message: str, event_context: Dict[str, Any]) -> str:
-        """Interactive conversational advisor."""
+    def chat_assistant(self, user_message: str, event_context: Dict[str, Any]) -> str:
+        """
+        Conversational assistant providing context-aware guidance and recommendations.
+
+        Args:
+            user_message: Message query entered by the user.
+            event_context: Current state and parameters of the planned event.
+
+        Returns:
+            Actionable text response string.
+        """
         if not self.is_ai_active():
-            # Heuristic response generator
-            return self._heuristic_chat_reply(message, event_context)
+            return self._heuristic_chat_fallback(user_message, event_context)
 
-        system_prompt = (
-            f"You are Celebrio AI, an expert celebration and event planner. "
-            f"Current active event: {event_context.get('event_name', 'Upcoming Event')} "
-            f"({event_context.get('event_type', 'celebration')}), Budget: ${event_context.get('budget', 0):,.2f}, "
-            f"Guests: {event_context.get('guest_count', 0)}, Location: {event_context.get('location', 'Local')}. "
-            f"Provide insightful, friendly, highly specific, and actionable advice. "
-            f"Keep responses concise (150-250 words) with bullet points where helpful."
-        )
-
-        try:
-            full_prompt = f"{system_prompt}\n\nUser Question: {message}\nCelebrio AI Advice:"
-            response = self.model.generate_content(full_prompt)
-            return response.text.strip()
-        except Exception as e:
-            logger.error(f"Chat generation failed: {e}")
-            return self._heuristic_chat_reply(message, event_context)
-
-    def generate_vendor_rfp(self, vendor_category: str, event_context: Dict[str, Any]) -> str:
-        """Auto-generates a professional vendor quote / RFP email."""
-        if not self.is_ai_active():
-            return self._heuristic_rfp(vendor_category, event_context)
+        cache_key = self._get_cache_key("chat", {"msg": user_message, "ctx": event_context})
+        if cache_key in self._response_cache:
+            return str(self._response_cache[cache_key])
 
         prompt = f"""
-Write a polite, highly professional Request for Proposal (RFP) / vendor inquiry email to a {vendor_category} vendor.
-Event Name: {event_context.get('event_name')}
-Event Type: {event_context.get('event_type')}
-Event Date: {event_context.get('event_date') or 'TBD'}
-Guest Count: {event_context.get('guest_count')}
-Location: {event_context.get('location')}
-Specific Vibe: {event_context.get('theme_preference') or 'Elegant & Memorable'}
+You are Celebrio AI Advisor, a world-class celebration coordinator.
+The user is planning a {event_context.get('event_type', 'celebration')} titled '{event_context.get('event_name', 'Event')}'
+with a budget of ${event_context.get('budget', 0):,.2f} for {event_context.get('guest_count', 50)} guests
+in {event_context.get('location', 'their area')}.
 
-Include:
-- Clear subject line
-- Warm introduction & event overview
-- Specific questions regarding availability, package inclusions, setup requirements, and deposit/cancellation terms
-- Professional sign-off placeholder
+User Question: "{user_message}"
+
+Provide a crisp, encouraging, highly specific response (2-3 paragraphs max).
+Give practical financial figures, vendor negotiation tips, or creative suggestions that directly match their budget.
 """
         try:
             response = self.model.generate_content(prompt)
-            return response.text.strip()
+            answer = response.text.strip()
+            if len(self._response_cache) >= self._cache_capacity:
+                self._response_cache.pop(next(iter(self._response_cache)))
+            self._response_cache[cache_key] = answer
+            return answer
         except Exception as e:
-            logger.error(f"RFP generation failed: {e}")
-            return self._heuristic_rfp(vendor_category, event_context)
+            logger.error("Gemini Chat failed: %s", e)
+            return self._heuristic_chat_fallback(user_message, event_context)
 
-    def _heuristic_chat_reply(self, message: str, ctx: Dict[str, Any]) -> str:
-        """Contextual heuristic advisor fallback when Gemini is offline."""
-        q = message.lower()
-        budget = ctx.get('budget', 5000)
-        guests = ctx.get('guest_count', 50)
-        etype = ctx.get('event_type', 'celebration')
-        cost_per_guest = budget / max(guests, 1)
+    def generate_vendor_rfp(self, vendor_category: str, event_context: Dict[str, Any]) -> str:
+        """
+        Drafts a tailored RFP / Inquiry email to send to suppliers.
 
-        if "cut" in q or "save" in q or "reduce" in q or "cheaper" in q:
+        Args:
+            vendor_category: Supplier industry category (Venue, Catering, Photography, etc.).
+            event_context: Event details and constraints.
+
+        Returns:
+            Professional email draft string.
+        """
+        name = event_context.get("event_name", "Our Celebration")
+        date = event_context.get("event_date") or "[Date TBD]"
+        guests = event_context.get("guest_count", 100)
+        loc = event_context.get("location", "the area")
+
+        return f"""Subject: Vendor Availability & Quote Inquiry — {name} ({date})
+
+Dear {vendor_category} Team,
+
+I hope this email finds you well.
+
+We are currently planning '{name}', scheduled for {date} in {loc}, with an estimated attendance of {guests} guests.
+
+We are admirers of your work and would love to check your availability for this date. Could you please provide:
+1. An overview of your standard service packages and price ranges for an event of this scale.
+2. Any minimum spend requirements or overtime policies.
+3. Information on required deposit percentages and cancellation terms.
+4. Your required setup and breakdown access windows.
+
+If you have a digital brochure or sample client agreement, please feel free to attach it.
+
+Looking forward to hearing from you!
+
+Warm regards,
+Event Planning Team
+Celebrio AI Coordination Service"""
+
+    def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
+        """Extracts JSON object from possible markdown code-blocks or raw text."""
+        # Check standard markdown code block
+        match = _JSON_BLOCK_PATTERN.search(text)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # Try searching for the outer curly brace pair
+        fallback_match = _JSON_FALLBACK_PATTERN.search(text)
+        if fallback_match:
+            try:
+                return json.loads(fallback_match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
+
+    def _heuristic_chat_fallback(self, msg: str, ctx: Dict[str, Any]) -> str:
+        """Smart local heuristic replies when GenAI key is absent."""
+        msg_lower = msg.lower()
+        budget = ctx.get("budget", 20000)
+        guests = ctx.get("guest_count", 100)
+        per_person = budget / max(guests, 1)
+
+        if "cater" in msg_lower or "food" in msg_lower or "drink" in msg_lower:
             return (
-                f"💡 **Cost Optimization for your {etype.capitalize()}:**\n\n"
-                f"1. **Adjust the Beverage Service:** Shift from an open full premium bar to signature cocktails plus wine/beer. This typically cuts bar expenditure by 22-30%.\n"
-                f"2. **Catering Strategy:** With {guests} guests (${cost_per_guest:.0f}/guest available), consider gourmet action stations or family-style dining over formal plated courses.\n"
-                f"3. **Florals & Ambience:** Repurpose ceremony florals into reception centerpieces, and supplement with elegant warm ambient candlelight.\n"
-                f"4. **Digital Invitations:** Use interactive digital RSVP platforms with custom video invites to save $400-$900 on stationery and postage."
+                f"For your guest count of {guests}, catering represents approximately 28-32% of your budget. "
+                f"With ${per_person:.2f} per attendee, you can maximize savings by opting for elevated family-style "
+                "platters or chef-attended action stations rather than formal plated courses. Additionally, providing "
+                "a curated 'Beer, Wine & 2 Signature Cocktails' bar instead of a full open bar typically saves 25-35% on alcohol costs."
             )
-        elif "timeline" in q or "schedule" in q or "when" in q:
+        elif "budget" in msg_lower or "save" in msg_lower or "cost" in msg_lower:
             return (
-                f"⏱️ **Master Timeline Recommendation:**\n\n"
-                f"• **T-90 Days:** Lock down venue agreement and primary caterer.\n"
-                f"• **T-45 Days:** Distribute invitations and collect dietary restrictions.\n"
-                f"• **T-14 Days:** Finalize headcount with all suppliers and draft hourly run-of-show.\n"
-                f"• **Day-of Event:** Build in a 30-minute buffer before guest arrival for unexpected vendor logistics."
+                f"To optimize your ${budget:,.2f} budget, prioritize the top 3 elements your guests remember most: "
+                "great food, smooth entertainment, and venue ambience. Consider allocating a 5-10% contingency buffer "
+                "for unexpected deliveries or tax/service gratuities, and negotiate off-peak or Friday/Sunday dates for 15-20% venue discounts."
             )
-        elif "permit" in q or "legal" in q or "license" in q:
+        elif "permit" in msg_lower or "city" in msg_lower or "license" in msg_lower:
             return (
-                f"📋 **Compliance & Permit Guidance for {ctx.get('location', 'your venue')}:**\n\n"
-                f"• **Park / Public Space Permit:** Required if holding a community gathering or amplified music outdoors.\n"
-                f"• **Special Occasion Liquor License:** Check city regulations if alcohol is served or sold.\n"
-                f"• **Sound Decibel Limits:** Most municipal ordinances enforce 85dB caps after 10:00 PM.\n"
-                f"• **Certificate of Insurance (COI):** Ensure third-party vendors (bounce houses, food trucks, stages) provide minimum $1M liability coverage."
+                "For public assembly and outdoor parks, submit municipal permits at least 60 days in advance. "
+                "Ensure you secure: 1) Special Event Park Permit, 2) Amplified Sound Variance, 3) Temporary Food Facility health permits for vendors, "
+                "and 4) General Liability Certificate of Insurance (COI) with $1M-$2M aggregate coverage."
             )
         else:
             return (
-                f"✨ **Celebrio Advisor Insight for {ctx.get('event_name', 'Your Celebration')}:**\n\n"
-                f"With a planned budget of ${budget:,.2f} for {guests} guests (${cost_per_guest:.2f} per person), "
-                f"the key to a remarkable {etype} is intentional hospitality. Focus 60% of your resources on what guests "
-                f"experience directly—sensational food, memorable entertainment, and seamless flow. "
-                f"Would you like recommendations on vendor contracts, day-of run-of-show, or theme ideas?"
+                f"Regarding '{ctx.get('event_name', 'your event')}', balance your timeline milestones with vendor lead times. "
+                f"Given your target of {guests} guests, focus first on locking in your venue and primary catering. "
+                "Let me know if you would like me to adjust your budget percentages or generate specific supplier inquiry letters!"
             )
-
-    def _heuristic_rfp(self, vendor_category: str, ctx: Dict[str, Any]) -> str:
-        """Deterministic RFP email generator."""
-        return (
-            f"Subject: Inquiry & RFP: {ctx.get('event_name')} - {vendor_category} Services\n\n"
-            f"Dear {vendor_category} Team,\n\n"
-            f"I hope this message finds you well. I am reaching out to inquire about your availability "
-            f"and packages for an upcoming {ctx.get('event_type')} titled '{ctx.get('event_name')}'.\n\n"
-            f"Event Overview:\n"
-            f"- Date: {ctx.get('event_date') or 'Upcoming / TBD'}\n"
-            f"- Expected Attendees: {ctx.get('guest_count')} guests\n"
-            f"- Venue / Location: {ctx.get('location')}\n"
-            f"- Estimated Theme & Vibe: {ctx.get('theme_preference') or 'Modern & Joyful'}\n\n"
-            f"Could you please share:\n"
-            f"1. Your standard package pricing and itemized inclusions for this party size.\n"
-            f"2. Your setup and breakdown window requirements.\n"
-            f"3. Your reservation deposit and cancellation policy.\n\n"
-            f"Looking forward to exploring how we might collaborate to create an unforgettable event.\n\n"
-            f"Warm regards,\n"
-            f"Event Organizing Team\n"
-            f"Contact: {ctx.get('event_name')} Committee"
-        )

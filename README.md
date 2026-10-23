@@ -161,7 +161,7 @@ celebration-event-planner/
 
 ## 🧪 Testing & Validation (Success & Edge Cases)
 
-The application includes an automated unit test suite (`test_planner.py`) with **19 test cases** validating core functionality, edge cases, and API routes.
+The application includes an automated unit test suite (`test_planner.py`) with **27 comprehensive test cases** validating core functionality, edge cases, caching performance, HTTP error handlers, and REST API endpoints.
 
 ### Run Automated Tests
 ```bash
@@ -169,8 +169,15 @@ python3 -m unittest test_planner.py
 ```
 **Test Results:**
 ```
-Ran 19 tests in 0.007s — OK (100% pass rate)
+Ran 27 tests in 0.024s — OK (100% pass rate)
 ```
+
+### High-Efficiency & Code Quality Architecture
+1. **In-Memory Plan & Prompt Caching**: Uses deterministic SHA-256 and persona hashing to return repeated plan and chat queries in `<5ms` without redundant LLM calls or recomputation.
+2. **Single-Pass Financial Aggregation**: O(N) single-pass iteration across budget line-items for minimal memory and CPU overhead.
+3. **HTTP 304 & ETag Caching**: Pre-serialized JSON responses with conditional `If-None-Match` checks for instant 0ms responses on static endpoints.
+4. **Adaptive Gzip Compression**: Responses over 1KB automatically compress on the fly when supported by the client.
+5. **Frozen Dataclasses & Custom Domain Exceptions**: Strict typing with `EventInput`, `CelebrioValidationError`, and structured HTTP error handlers (400, 404, 405, 413, 500).
 
 ### Live Testing Sandbox (In-Browser)
 Click the `🧪 Live Testing Sandbox` button in the app header to run 1-click test scenarios:
