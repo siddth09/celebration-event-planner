@@ -8,7 +8,7 @@ import os
 import json
 import gzip
 import logging
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Tuple
 from flask import Flask, request, jsonify, send_from_directory, Response, make_response
 from dotenv import load_dotenv
 
@@ -38,19 +38,26 @@ _PRESETS_ETAG: str = '"celebrio-presets-v1"'
 def add_performance_and_security_headers(response: Response) -> Response:
     """
     Applies security headers and Gzip compression to responses over 1KB.
+
+    Args:
+        response: Outgoing Flask Response object.
+
+    Returns:
+        Augmented Response with security headers and optional Gzip stream.
     """
-    # Security headers
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
 
-    # Gzip compression for text/json responses when accepted by client
     accept_encoding = request.headers.get("Accept-Encoding", "")
+    compressible_types = (
+        "application/json", "text/html", "text/css", "application/javascript"
+    )
     if (
         "gzip" in accept_encoding.lower() and
         response.status_code == 200 and
         response.content_length and response.content_length > 1024 and
-        response.mimetype in ("application/json", "text/html", "text/css", "application/javascript")
+        response.mimetype in compressible_types
     ):
         try:
             compressed = gzip.compress(response.get_data())
@@ -58,7 +65,7 @@ def add_performance_and_security_headers(response: Response) -> Response:
             response.headers["Content-Encoding"] = "gzip"
             response.headers["Content-Length"] = len(compressed)
         except Exception:
-            pass  # Fall back to uncompressed on any exception
+            pass
 
     return response
 
@@ -68,28 +75,53 @@ def add_performance_and_security_headers(response: Response) -> Response:
 # -------------------------------------------------------------
 @app.errorhandler(400)
 def handle_bad_request(e: Any) -> Tuple[Response, int]:
-    return jsonify({"success": False, "error": "Bad request format or invalid parameters.", "status": 400}), 400
+    """Catches HTTP 400 Bad Request errors and formats standard JSON."""
+    return jsonify({
+        "success": False,
+        "error": "Bad request format or invalid parameters.",
+        "status": 400
+    }), 400
 
 
 @app.errorhandler(404)
 def handle_not_found(e: Any) -> Tuple[Response, int]:
-    return jsonify({"success": False, "error": "Requested resource was not found.", "status": 404}), 404
+    """Catches HTTP 404 Not Found errors and formats standard JSON."""
+    return jsonify({
+        "success": False,
+        "error": "Requested resource was not found.",
+        "status": 404
+    }), 404
 
 
 @app.errorhandler(405)
 def handle_method_not_allowed(e: Any) -> Tuple[Response, int]:
-    return jsonify({"success": False, "error": "HTTP method not allowed for this endpoint.", "status": 405}), 405
+    """Catches HTTP 405 Method Not Allowed errors and formats standard JSON."""
+    return jsonify({
+        "success": False,
+        "error": "HTTP method not allowed for this endpoint.",
+        "status": 405
+    }), 405
 
 
 @app.errorhandler(413)
 def handle_payload_too_large(e: Any) -> Tuple[Response, int]:
-    return jsonify({"success": False, "error": "Payload exceeds maximum allowed 2MB limit.", "status": 413}), 413
+    """Catches HTTP 413 Payload Too Large errors when payload exceeds 2MB."""
+    return jsonify({
+        "success": False,
+        "error": "Payload exceeds maximum allowed 2MB limit.",
+        "status": 413
+    }), 413
 
 
 @app.errorhandler(500)
 def handle_internal_server_error(e: Any) -> Tuple[Response, int]:
+    """Catches unhandled server exceptions and returns generic error response."""
     logger.exception("Unhandled server exception: %s", e)
-    return jsonify({"success": False, "error": "An internal error occurred. Please try again.", "status": 500}), 500
+    return jsonify({
+        "success": False,
+        "error": "An internal error occurred. Please try again.",
+        "status": 500
+    }), 500
 
 
 # -------------------------------------------------------------
@@ -175,7 +207,10 @@ def generate_plan() -> Tuple[Response, int]:
         return jsonify({"success": False, "error": str(ve)}), 400
     except Exception as e:
         logger.exception("Plan generation error: %s", e)
-        return jsonify({"success": False, "error": "Failed to synthesize event plan. Please check inputs."}), 500
+        return jsonify({
+            "success": False,
+            "error": "Failed to synthesize event plan. Please check inputs."
+        }), 500
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -208,7 +243,6 @@ def vendor_inquiry() -> Tuple[Response, int]:
         data = request.get_json(force=True)
         vendor_category = str(data.get("vendor_category", "Venue")).strip()
         event_context = data.get("event_context", {})
-        
         email_body = engine.generate_vendor_inquiry(vendor_category, event_context)
         return jsonify({
             "success": True,
@@ -223,5 +257,8 @@ def vendor_inquiry() -> Tuple[Response, int]:
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
     debug_mode = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
-    logger.info("Starting Celebrio AI Planner on http://localhost:%d (GenAI active: %s)", port, engine.is_genai_enabled())
+    logger.info(
+        "Starting Celebrio AI Planner on http://localhost:%d (GenAI active: %s)",
+        port, engine.is_genai_enabled()
+    )
     app.run(host="0.0.0.0", port=port, debug=debug_mode)
