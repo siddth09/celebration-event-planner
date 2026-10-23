@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="wedding">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Celebrio AI is a smart GenAI-powered planning assistant that helps users organize weddings, milestone birthdays, and community festivals with dynamic budgets, countdown timelines, vendor checklists, and personalized creative ideas.">
+  <meta name="theme-color" content="#090D16">
+  <title>Celebrio AI | GenAI Celebration &amp; Event Planner</title>
+  
+  <!-- Favicon SVG -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Top Sticky Navigation Bar -->
+  <header class="app-header" role="banner">
+    <div class="header-container">
+      <a href="#" class="brand-wrapper" id="brand-link" aria-label="Celebrio AI Home">
+        <div class="brand-logo" id="brand-logo-icon" aria-hidden="true">✨</div>
+        <div class="brand-title">
+          <span>Celebrio</span>
+          <span style="opacity: 0.6; font-weight: 400;">AI</span>
+          <span class="brand-badge">GenAI Assistant</span>
+        </div>
+      </a>
+
+      <div class="header-actions" role="toolbar" aria-label="Quick Actions">
+        <button type="button" class="btn btn-accent btn-sm" id="btn-test-sandbox" aria-haspopup="dialog" aria-label="Open Live Testing & Edge Cases Sandbox">
+          🧪 <span>Live Testing Sandbox</span>
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-open-chat" aria-haspopup="dialog" aria-label="Open AI Event Advisor Drawer">
+          💬 <span>AI Advisor</span>
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-export-print" aria-label="Print or Export Plan">
+          🖨️ <span>Export</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-layout" id="main-content" role="main">
+    
+    <!-- Hero / Persona Switcher Ribbon -->
+    <nav class="persona-ribbon" role="tablist" aria-label="Celebration Types">
+      <button type="button" class="persona-pill active" data-type="wedding" role="tab" id="tab-persona-wedding" aria-selected="true">
+        <span aria-hidden="true">💍</span>
+        <span>Wedding Celebration</span>
+      </button>
+      <button type="button" class="persona-pill" data-type="birthday" role="tab" id="tab-persona-birthday" aria-selected="false">
+        <span aria-hidden="true">🎂</span>
+        <span>Milestone Birthday</span>
+      </button>
+      <button type="button" class="persona-pill" data-type="community" role="tab" id="tab-persona-community" aria-selected="false">
+        <span aria-hidden="true">🎪</span>
+        <span>Community &amp; Festival</span>
+      </button>
+      <button type="button" class="persona-pill" data-type="custom" role="tab" id="tab-persona-custom" aria-selected="false">
+        <span aria-hidden="true">✨</span>
+        <span>Custom Celebration</span>
+      </button>
+    </nav>
+
+    <!-- Event Planner Input Form Card -->
+    <section class="glass-card" aria-labelledby="form-section-heading">
+      <div class="card-header-flex">
+        <div>
+          <h1 class="card-title" id="form-section-heading">
+            <span id="persona-icon-display">💍</span>
+            <span id="persona-heading-text">Wedding Celebration Planner</span>
+          </h1>
+          <p class="stat-subtext" id="persona-description-text">
+            Configure your celebration parameters. Celebrio's GenAI model calculates budget splits, vendor roadmaps, and custom design ideas.
+          </p>
+        </div>
+        <div id="ai-status-indicator" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--status-success);">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--status-success);"></span>
+          <span>GenAI Active</span>
+        </div>
+      </div>
+
+      <form id="planner-form" novalidate>
+        <div class="planner-form-grid">
+          <!-- Event Name -->
+          <div class="form-group" style="grid-column: span 2;">
+            <label for="input-event-name" class="form-label">
+              <span>Event Name <span style="color:var(--status-danger);">*</span></span>
+              <span id="event-name-counter" class="stat-subtext">0/120</span>
+            </label>
+            <input type="text" id="input-event-name" class="form-input" placeholder="e.g. Maya &amp; Liam's Sunset Vineyard Wedding" required maxlength="120" value="Sarah &amp; Alex Autumn Vineyard Wedding">
+          </div>
+
+          <!-- Total Budget -->
+          <div class="form-group">
+            <label for="input-budget" class="form-label">
+              <span>Total Budget (USD $) <span style="color:var(--status-danger);">*</span></span>
+            </label>
+            <input type="number" id="input-budget" class="form-input" placeholder="25000" min="100" max="10000000" step="50" required value="28000">
+          </div>
+
+          <!-- Guest Count -->
+          <div class="form-group">
+            <label for="input-guests" class="form-label">
+              <span>Expected Guests <span style="color:var(--status-danger);">*</span></span>
+            </label>
+            <input type="number" id="input-guests" class="form-input" placeholder="120" min="1" max="50000" required value="120">
+          </div>
+
+          <!-- Target Event Date -->
+          <div class="form-group">
+            <label for="input-date" class="form-label">Target Date</label>
+            <input type="date" id="input-date" class="form-input" value="2026-11-20">
+          </div>
+
+          <!-- Venue / Location -->
+          <div class="form-group">
+            <label for="input-location" class="form-label">Location / City</label>
+            <input type="text" id="input-location" class="form-input" placeholder="e.g. Napa Valley, California" value="Napa Valley, CA">
+          </div>
+
+          <!-- Style / Theme Preference -->
+          <div class="form-group" style="grid-column: span 2;">
+            <label for="input-theme" class="form-label">Aesthetic Vibe / Theme Keywords</label>
+            <input type="text" id="input-theme" class="form-input" placeholder="e.g. Rustic Elegance, Warm Candlelight, Modern Minimalist" value="Rustic Chic, Candlelit Evening, Live Acoustic Music">
+            <div class="tags-row" id="quick-theme-tags">
+              <!-- Dynamically populated tags based on persona -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Action Buttons -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; border-top: 1px solid var(--border-glass); padding-top:1.25rem;">
+          <div id="form-validation-feedback" role="alert" style="font-size:0.85rem; color:var(--status-danger); min-height: 20px;"></div>
+          
+          <button type="submit" class="btn btn-primary" id="btn-generate-plan" style="padding: 0.75rem 1.75rem; font-size:1rem;">
+            <span id="btn-spinner" class="spinner" style="display:none;" aria-hidden="true"></span>
+            <span id="btn-text">✨ Synthesize GenAI Plan</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Plan Display Area (Hidden until generated) -->
+    <div id="plan-display-container" style="display:none;">
+      
+      <!-- Executive Summary Card -->
+      <section class="glass-card" style="border-left: 4px solid var(--accent-color);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem; margin-bottom: 0.75rem;">
+          <h2 class="card-title" style="font-size:1.25rem;">
+            <span>📋 Master Plan:</span>
+            <span id="display-event-name" style="color:var(--accent-color);">Sarah &amp; Alex Wedding</span>
+          </h2>
+          <span class="brand-badge" id="display-plan-source">Gemini 1.5 Flash GenAI</span>
+        </div>
+        <p id="display-plan-summary" style="font-size:1rem; color:var(--text-main); margin-bottom:1rem; line-height:1.6;"></p>
+        
+        <!-- Key Metrics Bar -->
+        <div class="stats-bar-grid">
+          <div class="stat-box">
+            <span class="stat-label">Total Budget</span>
+            <span class="stat-value" id="stat-total-budget">$0.00</span>
+            <span class="stat-subtext" id="stat-cost-per-guest">$0.00 per guest</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Allocated Planned</span>
+            <span class="stat-value" id="stat-allocated">$0.00</span>
+            <div class="progress-track">
+              <div class="progress-fill" id="stat-allocated-bar" style="width: 100%;"></div>
+            </div>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Actual Spent</span>
+            <span class="stat-value" id="stat-actual-spent">$0.00</span>
+            <span class="stat-subtext" id="stat-actual-utilization">0% utilized</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Remaining Balance</span>
+            <span class="stat-value" id="stat-remaining" style="color:var(--status-success);">$0.00</span>
+            <span class="stat-subtext" id="stat-budget-status">On Track</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Four Pillars Navigation Tabs -->
+      <nav class="dashboard-tabs" role="tablist" aria-label="Event Plan Pillars">
+        <button type="button" class="tab-btn active" data-pillar="budget" role="tab" id="tab-pillar-budget" aria-selected="true">
+          💰 <span>Budget &amp; Expenses</span>
+        </button>
+        <button type="button" class="tab-btn" data-pillar="timeline" role="tab" id="tab-pillar-timeline" aria-selected="false">
+          ⏱️ <span>Milestone Timeline</span>
+        </button>
+        <button type="button" class="tab-btn" data-pillar="vendors" role="tab" id="tab-pillar-vendors" aria-selected="false">
+          🤝 <span>Vendor Checklists &amp; RFP</span>
+        </button>
+        <button type="button" class="tab-btn" data-pillar="ideas" role="tab" id="tab-pillar-ideas" aria-selected="false">
+          🎨 <span>Personalized Ideas</span>
+        </button>
+      </nav>
+
+      <!-- Pillar 1: Dynamic Budget Breakdown & Expense Tracker -->
+      <section class="pillar-content active" id="pillar-budget" role="tabpanel" aria-labelledby="tab-pillar-budget">
+        <div class="glass-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">💰 Dynamic Budget Allocations &amp; Expense Manager</h2>
+              <p class="stat-subtext">Click on any category to log actual expenses. Real-time balance and variance update automatically.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-rebalance-budget">
+              ⚖️ <span>Rebalance Proportions</span>
+            </button>
+          </div>
+
+          <div class="budget-category-grid" id="budget-category-container">
+            <!-- Dynamically populated category cards -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Pillar 2: Milestone Countdown Timeline -->
+      <section class="pillar-content" id="pillar-timeline" role="tabpanel" aria-labelledby="tab-pillar-timeline" style="display:none;">
+        <div class="glass-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">⏱️ Milestone Countdown &amp; Day-Of Run-of-Show</h2>
+              <p class="stat-subtext">Actionable phases from early contracts down to hour-by-hour day-of execution.</p>
+            </div>
+            <div id="timeline-progress-counter" class="brand-badge" style="background:var(--accent-glow); color:var(--text-main);">
+              0 / 0 Milestones Completed
+            </div>
+          </div>
+
+          <div class="timeline-list" id="timeline-container">
+            <!-- Dynamically populated timeline phases -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Pillar 3: Vendor Checklist & Contract Manager -->
+      <section class="pillar-content" id="pillar-vendors" role="tabpanel" aria-labelledby="tab-pillar-vendors" style="display:none;">
+        <div class="glass-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">🤝 Vendor Checklists &amp; Instant AI Inquiry Generator</h2>
+              <p class="stat-subtext">Track booking status, supplier interview questions, and draft customized RFPs with 1 click.</p>
+            </div>
+            <span class="stat-subtext">Select status to track workflow</span>
+          </div>
+
+          <div class="vendor-grid" id="vendor-container">
+            <!-- Dynamically populated vendor cards -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Pillar 4: Personalized Ideas Board -->
+      <section class="pillar-content" id="pillar-ideas" role="tabpanel" aria-labelledby="tab-pillar-ideas" style="display:none;">
+        <div class="glass-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">🎨 Bespoke Creative Inspiration &amp; Aesthetic Board</h2>
+              <p class="stat-subtext">Curated color palette, signature touches, culinary concepts, and AI cost-saving optimizations.</p>
+            </div>
+            <span class="brand-badge" id="ideas-theme-badge">Curated Concept</span>
+          </div>
+
+          <!-- Color Palette Swatches -->
+          <h3 style="font-size:1.05rem; margin-top:0.5rem; margin-bottom:0.25rem;">Curated Color Palette (Click swatch to copy HEX)</h3>
+          <div class="palette-grid" id="palette-container">
+            <!-- Dynamically populated swatches -->
+          </div>
+
+          <!-- Creative Highlights Grid -->
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:1.25rem; margin-top:1.5rem;">
+            <div class="glass-card" style="margin-bottom:0; background:rgba(255,255,255,0.02);">
+              <h4 style="font-size:1rem; margin-bottom:0.5rem; color:var(--accent-color);">✨ Signature Features</h4>
+              <ul id="ideas-signature-list" style="padding-left:1.2rem; color:var(--text-muted); line-height:1.7;"></ul>
+            </div>
+            <div class="glass-card" style="margin-bottom:0; background:rgba(255,255,255,0.02);">
+              <h4 style="font-size:1rem; margin-bottom:0.5rem; color:var(--accent-color);">🍸 Curated Food &amp; Drink</h4>
+              <ul id="ideas-culinary-list" style="padding-left:1.2rem; color:var(--text-muted); line-height:1.7;"></ul>
+            </div>
+            <div class="glass-card" style="margin-bottom:0; background:rgba(255,255,255,0.02);">
+              <h4 style="font-size:1rem; margin-bottom:0.5rem; color:var(--accent-color);">🎉 Entertainment &amp; Activities</h4>
+              <ul id="ideas-entertainment-list" style="padding-left:1.2rem; color:var(--text-muted); line-height:1.7;"></ul>
+            </div>
+          </div>
+
+          <!-- Cost-Saving AI Tip Box -->
+          <div class="ideas-highlight-box" style="margin-top:1.25rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+              <span style="font-size:1.3rem;">💡</span>
+              <strong style="color:var(--text-main); font-size:1.05rem;">Celebrio AI High-Impact Cost Saving Strategy:</strong>
+            </div>
+            <p id="ideas-cost-saving-tip" style="color:var(--text-main); font-size:0.95rem; line-height:1.6;"></p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Live Testing Sandbox Modal -->
+  <div class="modal-overlay" id="modal-test-sandbox" role="dialog" aria-modal="true" aria-labelledby="modal-test-title">
+    <div class="modal-dialog">
+      <button type="button" class="modal-close-btn" id="btn-close-test-modal" aria-label="Close dialog">&times;</button>
+      <h2 id="modal-test-title" class="card-title" style="margin-bottom:0.5rem;">
+        🧪 Live Testing &amp; Edge Cases Sandbox
+      </h2>
+      <p class="stat-subtext" style="margin-bottom:1.25rem;">
+        Select any scenario below to auto-populate the planner and test system behavior live (demonstrates success pathways and error validations for evaluation).
+      </p>
+
+      <h3 style="font-size:0.9rem; text-transform:uppercase; color:var(--text-dim); margin-bottom:0.5rem;">Standard Success Test Cases</h3>
+      
+      <div class="test-scenario-card" data-scenario="wedding">
+        <div>
+          <strong>💍 Luxury Vineyard Wedding</strong>
+          <p class="stat-subtext">$35,000 Budget • 140 Guests • Napa Valley, CA • Rustic Elegance</p>
+        </div>
+        <span class="btn btn-secondary btn-sm">Load Case</span>
+      </div>
+
+      <div class="test-scenario-card" data-scenario="birthday">
+        <div>
+          <strong>🎂 Milestone 30th Birthday Bash</strong>
+          <p class="stat-subtext">$3,500 Budget • 35 Guests • Lounge &amp; Rooftop • Neon Retro 90s</p>
+        </div>
+        <span class="btn btn-secondary btn-sm">Load Case</span>
+      </div>
+
+      <div class="test-scenario-card" data-scenario="community">
+        <div>
+          <strong>🎪 Community Charity 5K &amp; Food Fair</strong>
+          <p class="stat-subtext">$12,000 Budget • 500 Attendees • Public Park • Permitted Civic Event</p>
+        </div>
+        <span class="btn btn-secondary btn-sm">Load Case</span>
+      </div>
+
+      <h3 style="font-size:0.9rem; text-transform:uppercase; color:var(--status-warning); margin-top:1.25rem; margin-bottom:0.5rem;">Validation &amp; Edge Cases</h3>
+
+      <div class="test-scenario-card edge-case" data-scenario="edge-negative">
+        <div>
+          <strong>⚠️ Edge Case 1: Negative Budget Validation</strong>
+          <p class="stat-subtext">Enters -$500 Budget • Tests input guard &amp; error response</p>
+        </div>
+        <span class="btn btn-secondary btn-sm">Test Error</span>
+      </div>
+
+      <div class="test-scenario-card edge-case" data-scenario="edge-empty">
+        <div>
+          <strong>⚠️ Edge Case 2: Missing Event Name &amp; Zero Budget</strong>
+          <p class="stat-subtext">Empty name, $0 budget • Demonstrates required field enforcement</p>
+        </div>
+        <span class="btn btn-secondary btn-sm">Test Error</span>
+      </div>
+
+      <div class="test-scenario-card edge-case" data-scenario="edge-xss">
+        <div>
+          <strong>🛡️ Edge Case 3: Script / XSS Prompt Injection Guard</strong>
+          <p class="stat-subtext">&lt;script&gt;alert(1)&lt;/script&gt; in title • Tests sanitization engine</p>
+        </div>
+        <span class="btn btn-secondary btn-sm">Test Guard</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor RFP Email Modal -->
+  <div class="modal-overlay" id="modal-vendor-rfp" role="dialog" aria-modal="true" aria-labelledby="modal-rfp-title">
+    <div class="modal-dialog">
+      <button type="button" class="modal-close-btn" id="btn-close-rfp-modal" aria-label="Close dialog">&times;</button>
+      <h2 id="modal-rfp-title" class="card-title" style="margin-bottom:0.5rem;">
+        ✉️ AI-Generated Vendor Inquiry (RFP)
+      </h2>
+      <p class="stat-subtext" id="rfp-modal-subtitle" style="margin-bottom:1rem;">
+        Personalized inquiry email tailored to your event requirements and guest count.
+      </p>
+
+      <textarea id="rfp-email-content" class="form-textarea" style="min-height: 250px; font-family: monospace; font-size: 0.88rem; margin-bottom: 1rem;" readonly></textarea>
+
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button type="button" class="btn btn-secondary" id="btn-copy-rfp">
+          📋 <span>Copy to Clipboard</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive AI Advisor Chat Drawer -->
+  <aside class="chat-drawer" id="chat-drawer" role="complementary" aria-label="Celebrio AI Event Advisor">
+    <div class="chat-header">
+      <div style="display:flex; align-items:center; gap:0.5rem;">
+        <span style="font-size:1.3rem;">💬</span>
+        <strong>Celebrio AI Advisor</strong>
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-close-chat" aria-label="Close chat drawer">&times;</button>
+    </div>
+
+    <!-- Quick Question Chips -->
+    <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-glass); background: rgba(0,0,0,0.15);">
+      <span style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Suggested Queries:</span>
+      <div class="tags-row" style="margin-top:0.35rem;">
+        <button type="button" class="tag-chip chat-suggestion-btn">How to cut 20% from catering?</button>
+        <button type="button" class="tag-chip chat-suggestion-btn">What permits are needed?</button>
+        <button type="button" class="tag-chip chat-suggestion-btn">Creative photo booth ideas</button>
+        <button type="button" class="tag-chip chat-suggestion-btn">Master timeline tips</button>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages" aria-live="polite">
+      <div class="chat-msg assistant">
+        👋 Hi! I am Celebrio AI, your celebration planning assistant. Ask me anything about budget allocation, timeline management, vendor contracts, municipal permits, or creative event concepts!
+      </div>
+    </div>
+
+    <form id="chat-form" class="chat-input-bar">
+      <input type="text" id="chat-input" class="form-input" placeholder="Ask a question..." autocomplete="off">
+      <button type="submit" class="btn btn-primary" id="btn-send-chat" aria-label="Send message">
+        <span>Send</span>
+      </button>
+    </form>
+  </aside>
+
+  <!-- JavaScript Application Bundle -->
+  <script src="js/app.js"></script>
+</body>
+</html>
